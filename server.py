@@ -1,5 +1,12 @@
 import socket
 import threading
+from datetime import datetime
+
+def write_log(message):
+    time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    with open("chat.log", "a") as file:
+        file.write(f"[{time}] {message}\n")
 
 def load_users():
     users = {}
@@ -36,7 +43,11 @@ def broadcast(msg, sender=None):
 def remove(conn):
     if conn in clients:
         name = clients[conn]
+
+        write_log(f"DISCONNECT | {name}")
+
         del clients[conn]
+
         broadcast(f"{name} left the chat")
 
 def handle(conn, addr):
@@ -63,6 +74,8 @@ def handle(conn, addr):
         name = username
         clients[conn] = name
 
+        write_log(f"CONNECT | {name} | {addr[0]}")
+
         broadcast(f"{name} joined the chat")
         print(f"{name} connected")
 
@@ -79,6 +92,9 @@ def handle(conn, addr):
 
             final_msg = f"{name}: {msg}"
             print(final_msg)
+
+            write_log(f"MESSAGE | {name} | {msg}")
+
             broadcast(final_msg, conn)
 
     except Exception as e:
