@@ -72,6 +72,11 @@ def handle(conn, addr):
             if not msg:
                 break
 
+            if msg == "/users":
+                online = "Online users:\n" + "\n".join(clients.values())
+                conn.send(online.encode())
+                continue
+
             final_msg = f"{name}: {msg}"
             print(final_msg)
             broadcast(final_msg, conn)
