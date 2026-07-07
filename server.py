@@ -1,6 +1,9 @@
 import socket
 import threading
+import time
 from datetime import datetime
+
+IDLE_LIMIT = 60
 
 def write_log(message):
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -30,6 +33,7 @@ server.listen()
 print("Server is running...")
 
 clients = {}
+last_activity = {}
 
 def broadcast(msg, sender=None):
     for c in clients:
@@ -41,14 +45,33 @@ def broadcast(msg, sender=None):
                 remove(c)
 
 def remove(conn):
-    if conn in clients:
-        name = clients[conn]
+    if conn not in clients:
+        return
 
-        write_log(f"DISCONNECT | {name}")
+    name = clients.pop(conn)
 
-        del clients[conn]
+    last_activity.pop(conn, None)
 
-        broadcast(f"{name} left the chat")
+    write_log(f"DISCONNECT | {name}")
+
+    broadcast(f"{name} left the chat")
+
+def check_idle_users():
+    while True:
+        current_time = time.time()
+
+        for conn in list(last_activity):
+            if current_time - last_activity[conn] > IDLE_LIMIT:
+                name = clients.get(conn)
+
+                if name:
+                    print(f"{name} disconnected (idle timeout)")
+                    write_log(f"TIMEOUT | {name}")
+
+                conn.close()
+                remove(conn)
+
+        time.sleep(10)
 
 def handle(conn, addr):
     try:
@@ -73,6 +96,7 @@ def handle(conn, addr):
 
         name = username
         clients[conn] = name
+        last_activity[conn] = time.time()
 
         write_log(f"CONNECT | {name} | {addr[0]}")
 
@@ -84,6 +108,8 @@ def handle(conn, addr):
 
             if not msg:
                 break
+
+            last_activity[conn] = time.time()
 
             if msg == "/users":
                 online = "Online users:\n" + "\n".join(clients.values())
@@ -106,6 +132,8 @@ def handle(conn, addr):
 users = load_users()
 
 print(users)
+
+threading.Thread(target=check_idle_users, daemon=True).start()
 
 while True:
     conn, addr = server.accept()
